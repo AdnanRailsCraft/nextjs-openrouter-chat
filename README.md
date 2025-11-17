@@ -35,7 +35,13 @@ npm install
 3. Create a \`.env.local\` file in the root directory:
 \`\`\`
 OPENROUTER_API_KEY=your_api_key_here
+OPENROUTER_MODEL=mistralai/mistral-7b-instruct:free
 \`\`\`
+
+Available models that support function calling:
+- \`mistralai/mistral-7b-instruct:free\` (default, free)
+- \`qwen/qwen-2.5-coder:free\` (free, good for function calling)
+- Other free models with function calling support on OpenRouter
 
 4. Run the development server:
 \`\`\`bash
@@ -46,7 +52,10 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Environment Variables
 
-- \`OPENROUTER_API_KEY\`: Your OpenRouter API key
+- \`OPENROUTER_API_KEY\`: Your OpenRouter API key (required)
+- \`OPENROUTER_MODEL\`: The model to use for the chat (defaults to \`mistralai/mistral-7b-instruct:free\`)
+- \`NEXT_PUBLIC_API_BASE_URL\`: Base URL for your app/backend (also used for headers) (optional)
+- \`POST_TOKEN\`: Token for API requests (optional)
 
 ## Built With
 

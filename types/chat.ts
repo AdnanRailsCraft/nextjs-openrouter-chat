@@ -1,10 +1,19 @@
 export interface Message {
-  role: 'user' | 'assistant' | 'system' | 'function';
+  role: 'user' | 'assistant' | 'system' | 'function' | 'tool';
   content: string;
   function_call?: {
     name: string;
     arguments: string;
   };
+  tool_calls?: Array<{
+    id: string;
+    type: 'function';
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
+  tool_call_id?: string;
   name?: string;
 }
 

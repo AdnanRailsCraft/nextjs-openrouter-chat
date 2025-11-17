@@ -1,4 +1,4 @@
-import { WeatherData, APIError, ToolCall } from '@/types/api';
+import { APIError, ToolCall } from '@/types/api';
 
 export const makeAPIRequest = async (url: string, method: string, token: string | null, body?: any) => {
   try {
@@ -40,7 +40,6 @@ export const makeAPIRequest = async (url: string, method: string, token: string 
 export const handleToolCall = async (
   toolCall: ToolCall,
   token: string | null,
-  setWeatherData: (data: WeatherData) => void,
   setError: (error: string) => void
 ) => {
   if (!token) {
@@ -57,17 +56,6 @@ export const handleToolCall = async (
 
       const data = await makeAPIRequest(url.toString(), 'GET', token);
       return JSON.stringify(data);
-    }
-    
-    if (toolCall?.function?.name === "get_current_weather") {
-      const args = JSON.parse(toolCall.function.arguments);
-      const weatherData = {
-        location: args.location,
-        temperature: 22,
-        conditions: "Sunny"
-      };
-      setWeatherData(weatherData);
-      return JSON.stringify(weatherData);
     }
   } catch (error) {
     console.error('Tool call handler error:', error);

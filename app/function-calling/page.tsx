@@ -1,16 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WeatherData, ToolCall } from '@/types/api';
+import { ToolCall } from '@/types/api';
 import Chat from '@/components/Chat';
-import WeatherWidget from '@/components/WeatherWidget';
 import { makeAPIRequest, handleToolCall } from '@/utils/api';
 
 const FunctionCalling = () => {
-    const [weatherData, setWeatherData] = useState<WeatherData>({});
     const [token, setToken] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const isEmpty = Object.keys(weatherData).length === 0;
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -29,7 +26,7 @@ const FunctionCalling = () => {
         }
 
         try {
-            return await handleToolCall(toolCall, token, setWeatherData, setError);
+            return await handleToolCall(toolCall, token, setError);
         } catch (error) {
             console.error('Tool call handler error:', error);
             setError(error instanceof Error ? error.message : 'Unknown error occurred');
@@ -40,15 +37,7 @@ const FunctionCalling = () => {
         <main className="min-h-screen p-8 bg-gray-100">
             <div className="container mx-auto">
                 <div className="flex flex-col lg:flex-row gap-8">
-                    <div className="lg:w-1/3">
-                        <WeatherWidget
-                            location={weatherData.location || "---"}
-                            temperature={weatherData.temperature?.toString() || "---"}
-                            conditions={weatherData.conditions || "Sunny"}
-                            isEmpty={isEmpty}
-                        />
-                    </div>
-                    <div className="lg:w-2/3">
+                    <div className="w-full">
                         <Chat toolCallHandler={toolCallHandler} />
                     </div>
                 </div>
