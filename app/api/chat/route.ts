@@ -45,6 +45,7 @@ interface CreateContentArgs {
   description: string;
   content_type: string;
   parent_id?: string;
+  confirm?: boolean;
 }
 
 interface EditContentArgs {
@@ -53,6 +54,7 @@ interface EditContentArgs {
     title?: string;
     description?: string;
   };
+  confirm?: boolean;
 }
 
 type FunctionArgs = FindContentArgs | CreateContentArgs | EditContentArgs;
@@ -62,7 +64,17 @@ interface FindContentResult {
 }
 
 interface CreateContentResult {
-  post: {
+  requires_confirmation?: boolean;
+  preview?: {
+    title: string;
+    content_type: string;
+    description: string;
+    html: string;
+    plain_text: string;
+    parent_id?: string;
+  };
+  instructions?: string;
+  post?: {
     link: string;
     title: string;
     content: string;
@@ -77,7 +89,16 @@ interface CreateContentResult {
 }
 
 interface EditContentResult {
-  post: {
+  requires_confirmation?: boolean;
+  preview?: {
+    content_id: string;
+    title?: string;
+    description?: string;
+    html?: string;
+    plain_text?: string;
+  };
+  instructions?: string;
+  post?: {
     link: string;
     title: string;
     content: string;
@@ -149,6 +170,41 @@ const toRichHtml = (input: string): string => {
   });
   flushList();
   return htmlParts.join('\n');
+};
+
+const htmlToPlainText = (html: string): string => {
+  if (!html) return '';
+  let text = html;
+  text = text.replace(/<\s*br\s*\/?\s*>/gi, '\n');
+  text = text.replace(/<\s*\/\s*(p|div|h[1-6]|li|ul|ol|blockquote|section|article)\s*>/gi, '\n');
+  text = text.replace(/<\s*(p|div|h[1-6]|li|ul|ol|blockquote|section|article)[^>]*>/gi, '\n');
+  text = text.replace(/<[^>]+>/g, '');
+  text = text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, '\'');
+  text = text.split('\n').map(line => line.trimEnd()).join('\n');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  return text.trim();
+};
+
+const logContentPreview = (label: string, content?: string) => {
+  const text = (content || '').trim();
+  if (!text) {
+    console.log(`   ${label}: <empty>`);
+    return;
+  }
+  const maxLength = 600;
+  const truncated = text.length > maxLength;
+  const preview = truncated ? `${text.slice(0, maxLength)}…` : text;
+  console.log(`   ${label} (${text.length} chars):`);
+  preview.split('\n').forEach(line => console.log(`      ${line}`));
+  if (truncated) {
+    console.log(`      …(truncated)`);
+  }
 };
 
 const getFunctions = (userToken?: string, token?: string) => ({
@@ -254,16 +310,43 @@ const getFunctions = (userToken?: string, token?: string) => ({
     console.log(`   Parent ID: ${args.parent_id || 'None'}`);
     console.log(`   User Token: ${userToken ? 'Present' : 'Not provided'}`);
 
+    const htmlBody = toRichHtml(args.description || '');
+    const plainText = htmlToPlainText(htmlBody);
+    const previewPayload = {
+      title: args.title,
+      content_type: args.content_type,
+      description: args.description,
+      html: htmlBody,
+      plain_text: plainText,
+      parent_id: args.parent_id
+    };
+
+    if (!args.confirm) {
+      console.log(`   ⚠️  Confirmation not provided. Returning preview instead of creating post.`);
+      logContentPreview('Raw description', args.description);
+      logContentPreview('HTML body preview', htmlBody);
+      logContentPreview('Plain text preview', plainText);
+      return {
+        requires_confirmation: true,
+        preview: previewPayload,
+        instructions: 'Please confirm this post before creation by calling create_content again with "confirm": true.'
+      };
+    }
+
+    logContentPreview('Raw description', args.description);
+
     const postData: any = {
       post: {
         title: args.title || '',
         post_type: args.content_type || '',
         content: {
           // Backend expects rich text; convert description to HTML
-          body: toRichHtml(args.description || '')
+          body: htmlBody
         }
       }
     };
+    logContentPreview('HTML body preview', postData.post.content.body);
+    logContentPreview('Plain text preview', plainText);
 
     if (args.content_type === "problem" && args.parent_id) {
       postData.post.subject_id = args.parent_id;
@@ -315,16 +398,42 @@ const getFunctions = (userToken?: string, token?: string) => ({
     console.log(`   New description: ${description ? 'Updated' : 'Unchanged'}`);
     console.log(`   User Token: ${userToken ? 'Present' : 'Not provided'}`);
 
+    const html = description ? toRichHtml(description) : undefined;
+    const plainText = html ? htmlToPlainText(html) : undefined;
+    const previewPayload = {
+      content_id,
+      title,
+      description,
+      html,
+      plain_text: plainText
+    };
+
+    if (!args.confirm) {
+      console.log(`   ⚠️  Confirmation not provided. Returning edit preview instead of updating post.`);
+      if (description) {
+        logContentPreview('New description (raw)', description);
+        logContentPreview('New description (HTML)', html);
+        logContentPreview('New description (plain text)', plainText);
+      }
+      return {
+        requires_confirmation: true,
+        preview: previewPayload,
+        instructions: 'Please confirm this edit by calling edit_content again with "confirm": true.'
+      };
+    }
+
     const postData: any = {
       post: {}
     };
 
     if (title) postData.post.title = title;
     if (description) {
-      const html = toRichHtml(description);
       postData.post.content = { body: html };
       // Some backends expect nested attributes naming
       postData.post.content_attributes = { body: html };
+      logContentPreview('New description (raw)', description);
+      logContentPreview('New description (HTML)', html);
+      logContentPreview('New description (plain text)', plainText);
     }
 
     console.log(`   📦 Request body:`, JSON.stringify(postData, null, 2));
@@ -406,6 +515,10 @@ const availableTools = [
           parent_id: {
             type: 'string',
             description: 'The parent ID (subject_id for problems, problem_id for ideas)',
+          },
+          confirm: {
+            type: 'boolean',
+            description: 'Set to true only after the user reviews the preview and approves creation.'
           }
         },
         required: ['title', 'description', 'content_type'],
@@ -437,6 +550,10 @@ const availableTools = [
               }
             },
             description: 'The changes to apply to the content',
+          },
+          confirm: {
+            type: 'boolean',
+            description: 'Set to true only after the user reviews the edit preview and approves updating.'
           }
         },
         required: ['content_id', 'changes'],

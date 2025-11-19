@@ -53,6 +53,11 @@ The current model (`mistralai/mistral-7b-instruct:free`) **does support function
 - ✅ **create_content**: Create new content (subjects, problems, ideas)
 - ✅ **edit_content**: Edit existing content
 
+> **Important:** Both `create_content` and `edit_content` now require an explicit confirmation step.  
+> 1. First call the tool without the `confirm` flag to receive a preview payload.  
+> 2. The preview includes the original description, the HTML body that will be sent, and a plain-text rendition with all rich formatting stripped out.  
+> 3. Once the user approves, call the same tool again with `confirm: true` to execute the action.
+
 ## Notes About MiniMax M2
 
 MiniMax M2 is not available through OpenRouter at this time. If MiniMax models become available on OpenRouter in the future, you can add them using the same environment variable approach.
