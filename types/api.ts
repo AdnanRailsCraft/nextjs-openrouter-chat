@@ -7,12 +7,6 @@ export interface ToolCall {
   };
 }
 
-export interface WeatherData {
-  location?: string;
-  temperature?: number;
-  conditions?: string;
-}
-
 export interface ContentData {
   type: string;
   title: string;

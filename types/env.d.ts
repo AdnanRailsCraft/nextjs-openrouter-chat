@@ -1,6 +1,8 @@
 declare namespace NodeJS {
   interface ProcessEnv {
     OPENROUTER_API_KEY: string;
-    NEXT_PUBLIC_WEATHER_API_KEY: string; // For our sample weather function
+    OPENROUTER_MODEL: string; // The model to use for the chat
+    NEXT_PUBLIC_API_BASE_URL?: string;
+    POST_TOKEN?: string;
   }
 }
