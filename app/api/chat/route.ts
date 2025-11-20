@@ -3,6 +3,7 @@ import { Message } from '@/types/chat';
 import { SYSTEM_PROMPT } from '@/app/prompts/system';
 import axios from 'axios';
 import { conversationStore } from '@/utils/memory';
+import { saveConversationToDisk } from '@/utils/conversationPersistence';
 import { randomUUID } from 'crypto';
 import { ToolCall } from '@/types/api';
 import http from 'http';
@@ -817,7 +818,10 @@ export async function POST(req: Request) {
     if (assistantMessage) {
       toAppend.push(assistantMessage);
     }
-    conversationStore.append(id, toAppend, MAX_STORED_MESSAGES);
+    const persistedHistory = conversationStore.append(id, toAppend, MAX_STORED_MESSAGES);
+    saveConversationToDisk(id, persistedHistory).catch((error) => {
+      console.error('Failed to persist conversation to disk', error);
+    });
 
     // Best-effort token decrement after successful completion
     (async () => {
