@@ -184,6 +184,94 @@ const renderMessageContent = (raw: string): React.ReactNode => {
   return elements.length > 0 ? elements : applyInlineFormatting(content);
 };
 
+interface PersistedMessagePayload {
+  role: Message['role'];
+  content: string;
+  metadata?: Record<string, unknown>;
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+
+const buildPreviewText = (text: string, maxLength: number): string => {
+  if (!text) return '';
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+};
+
+const persistChatThread = async (
+  threadId: string,
+  token: string,
+  title?: string,
+  lastMessage?: string
+) => {
+  if (!threadId || !token) return;
+
+  const chatThreadPayload: Record<string, string> = {
+    thread_id: threadId,
+  };
+
+  if (title) {
+    chatThreadPayload.title = title;
+  }
+
+  if (lastMessage) {
+    chatThreadPayload.last_message = lastMessage;
+  }
+
+  const body: Record<string, unknown> = {
+    chat_thread: chatThreadPayload,
+    thread_id: threadId,
+  };
+
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/chat_threads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    console.warn('Failed to persist chat thread metadata', error);
+  }
+};
+
+const persistChatMessages = async (
+  threadId: string,
+  token: string,
+  messages: PersistedMessagePayload[],
+  title?: string,
+  lastMessage?: string
+) => {
+  if (!threadId || !token || messages.length === 0) return;
+
+  const body: Record<string, unknown> = {
+    thread_id: threadId,
+    messages,
+  };
+
+  if (title) {
+    body.title = title;
+  }
+
+  if (lastMessage) {
+    body.last_message = lastMessage;
+  }
+
+  try {
+    await fetch(`${API_BASE_URL}/api/v1/chat_messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    console.warn('Failed to persist chat messages', error);
+  }
+};
+
 export default function Chat({ toolCallHandler, conversationId, onConversationChange, noBorder = false, userId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -213,7 +301,7 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
       }
       setCurrentConversationId(conversationId);
     }
-  }, [conversationId, currentConversationId]);
+  }, [conversationId, currentConversationId, userId]);
 
   // Auto-scroll to the bottom when messages change
   useEffect(() => {
@@ -233,7 +321,7 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ conversationId }),
+        body: JSON.stringify({ conversationId, userToken: userId || undefined }),
       });
 
       if (response.ok) {
@@ -292,6 +380,28 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
           content: ensureVisibleContent(rawContent)
         };
       }
+
+      const assistantVisibleContent = assistantMessage?.content || '';
+      const sidebarTitle = buildPreviewText(userMessage.content, 50);
+      const sidebarLastMessage = buildPreviewText(assistantVisibleContent, 100);
+      const threadTitle = buildPreviewText(userMessage.content, 80);
+      const threadLastMessage = buildPreviewText(assistantVisibleContent, 160);
+      const persistedMessages: PersistedMessagePayload[] = [
+        { role: userMessage.role, content: userMessage.content }
+      ];
+
+      if (assistantMessage) {
+        const assistantPayload: PersistedMessagePayload = {
+          role: assistantMessage.role,
+          content: assistantVisibleContent
+        };
+
+        if (data?.choices?.[0]?.message) {
+          assistantPayload.metadata = { raw: data.choices[0].message };
+        }
+
+        persistedMessages.push(assistantPayload);
+      }
       
       // Append only the assistant message because the user message was optimistically added
       setMessages(prev => [...prev, assistantMessage]);
@@ -307,32 +417,18 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
       // Update conversation ID if it's new
       if (data.conversationId && data.conversationId !== currentConversationId) {
         setCurrentConversationId(data.conversationId);
+      }
 
-        // Persist the conversation/thread id to Rails backend
-        try {
-          await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/v1/chat_threads`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              // Backend resolves user/guest via Authorization header
-              'Authorization': userId || ''
-            },
-            body: JSON.stringify({
-              chat_thread: { thread_id: data.conversationId },
-              // Some backend logic references params[:thread_id]
-              thread_id: data.conversationId
-            })
-          });
-        } catch (e) {
-          console.warn('Failed to persist chat_thread', e);
-        }
+      if (data.conversationId && userId) {
+        void persistChatThread(data.conversationId, userId, threadTitle, threadLastMessage);
+        void persistChatMessages(data.conversationId, userId, persistedMessages, threadTitle, threadLastMessage);
       }
 
       // Always notify parent component about conversation update
       if (onConversationChange && data.conversationId) {
-        const title = userMessage.content.substring(0, 50) + (userMessage.content.length > 50 ? '...' : '');
-        const filteredContent = ensureVisibleContent(assistantMessage.content || '');
-        const lastMessage = filteredContent.substring(0, 100) + (filteredContent.length > 100 ? '...' : '');
+        const title = sidebarTitle || userMessage.content;
+        const filteredContent = assistantVisibleContent;
+        const lastMessage = sidebarLastMessage || filteredContent;
         console.log('Chat: Notifying conversation change:', { conversationId: data.conversationId, title, lastMessage });
         onConversationChange(data.conversationId, title, lastMessage);
       }

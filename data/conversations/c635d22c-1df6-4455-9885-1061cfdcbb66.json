@@ -1,0 +1,159 @@
+{
+  "conversationId": "c635d22c-1df6-4455-9885-1061cfdcbb66",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hi"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! I'm Lotte, your assistant for Needpedia.org. I'm here to help you create and edit idea posts, browse content, and navigate topics. How can I assist you today?",
+      "refusal": null,
+      "reasoning": null
+    },
+    {
+      "role": "user",
+      "content": "is there is any post relted to water"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes, there is content related to water in our database. I found one subject titled \"Water Conservation\" which might be what you're looking for.\n\nWould you like me to:\n1. Show you more details about this Water Conservation subject?\n2. Search for more specific water-related topics?\n3. Look for problems or ideas specifically related to water conservation?\n\nPlease let me know how you'd like to proceed.",
+      "refusal": null,
+      "reasoning": null
+    },
+    {
+      "role": "user",
+      "content": "is there is any post reated to global worming or climate change"
+    },
+    {
+      "role": "assistant",
+      "content": "No, there are currently no posts (subjects, problems, or ideas) related to \"global warming\" or \"climate change\" on Needpedia.\n\nWould you like to:\n1. **Create a new subject** on climate change or global warming? (This would be the starting point for related problems and ideas.)\n2. **Search for related topics** with different keywords (e.g., \"environment\", \"CO2 emissions\")?\n3. **Browse other environmental subjects** to explore?\n\nLet me know how I can help! 😊",
+      "refusal": null,
+      "reasoning": null,
+      "reasoning_details": [
+        {
+          "id": "rs_6c837821-c977-65c4-1e4d-fab56003054b",
+          "format": "xai-responses-v1",
+          "index": 0,
+          "type": "reasoning.encrypted",
+          "data": "wEzSCeF3bCUk+2BHZ2C1mXZJ5x6Gpz1g24gNh7+y/81ybqu7UeF6MvzqZ/eB+ZYns0d8f9pA9a0A2MpqxAEgXetebTIR14e4qx/REshRIB4sy5iKNDkfXoxqH0qpnc9upBvRXz2xtbrC3HhNKaX3m7QRzM2MmCbVkyJueSTOGa+KojZXoGYAw3QHnyUCQPXqx0pvymMq6ep/Px9D61Zf3BuwsLDE7CzZSPFGXqX+CWBWCGOsPe29dfcECCulk5gbDJITnDnTR5r0S+Thn0iyDv/DjywXR2dum9dwuii1vL+ZhT/LP6b+9T4NDwH+VF9ljmgCLufqbPe63nxheUL3zx+5gZQdlLhkx5X9FX80RtEMnyS+SxmUvzKv/fdxPQzrNxoY6zNQa2VVm12cCoEUnp+PACPaRZSe8mtQsTNf1I8xfQvic9A4zmcGa/jdBxo7Xgrx5q+bYbW1k7ng/ZOmYYJg5iWT2cZptsApvqAYMyPRptErqP0x3dPw2iQegGx8EulxOLSbNNfNI8jcuowJ5mHTMif0rmo2EcTVpvZZMYU2aJMMHpY4A6pw1G6Dra2hX7JLihOmqknIa70kcjdU"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "creta one"
+    },
+    {
+      "role": "assistant",
+      "content": "Great! Let's create a new **subject** on \"Climate Change\" or \"Global Warming\" as the foundation. (We can add problems and ideas under it later.)\n\n### Step 1: Provide Details\nPlease share:\n- **Title** (e.g., \"Climate Change\" or \"Global Warming Impacts\")\n- **Description** (a short overview, using rich-text like **bold**, *italics*, bullet points, etc. Keep it 2-5 sentences.)\n\nExample:\n**Title:** Climate Change  \n**Description:** Climate change refers to long-term shifts in temperatures and weather patterns. <br> • Driven primarily by human activities like burning fossil fuels. <br> • Leads to rising sea levels, extreme weather, and biodiversity loss.\n\nReply with your suggestions, and I'll preview it before creating! 🚀",
+      "refusal": null,
+      "reasoning": null,
+      "reasoning_details": [
+        {
+          "id": "rs_a5152216-7c54-4ac1-e9c7-f741f24cab1e",
+          "format": "xai-responses-v1",
+          "index": 0,
+          "type": "reasoning.encrypted",
+          "data": "sq8vylvRP/Bam2k/hJaEXHudWlsErrWiMysgsDVAnT00S2bcqq6WKzce/OuBKBPBTKg8Q47Ym04Ei6/F6OFeNhlPvs2sx3mfM8KFJkcFb7CtJbiC/YdvpMsMsBp2H+qS0IFm0PyZALu1NdjHhieldpncOUOnyxQuzFydtdDnkHZ91FNxN/IlSkzNTqdOW0D7zs+bkQb0dX43UuvZX/KUKotOFjPMYqZ5GENC5yct8BHpbgA09dEL9CwenEpr30ONVoY9V3yApo3K7FLaipvR5cF37aiEUXpYKIOqdV3BQ+mK4PjOdzOjunwfOAvu0UiUecfwzKPuG+VaVDigPV27YCQZd7l5xwWOx9xpbJdab4DSEjom2GpjBUNJJ5t9DlCW6FpGkFfEoNo6ohDyx6c4iEt1ltCFnZT6GCfluDaWhMSYAw2Eg34tPEAh42CKoPw3aYfr01Aa2kkaD3S++LeihkZ1AlR3QIe41QKYSa3Eq0xqr4zFSP+CnUEqJ90wA9XuG9L/YuGjgMQ2B3cI0c1hc5OTbbRqQHaO6ELkCdGT6MpJTzzPd7ivf64oRbJeD/1G0GT9nNh7gVfCjpX5TqgAV58tVKIoMUbX/FqiFq7f+H19mqXuMSgCB3till6WQnqFczE/AuefiddjZYzT8IM6gY4xpxDtRdhQP1qOurYEldp1Wcwcw5wVhj/K+6DK2sIiTh0BwXnX1bQ8keTI92XJUdwdohPQHycbef1xDfOP4lvjv1fkHevSoscfdQhWlT8SfUt9RKVo7qOFmvct0frfOgKOaoRbR2+FVdOQxTUlGvjnxRuvbQuw+LJgqj+mZI4tGcZP7gr8hwOrW4cbswQWj+wZ6SAicmj43PVtzX2LBlwiZJxheYDCJAfR5GMHkXVBdfniOAOpfx6xr1hrdcPdMBOdUCEtZ0c5fZgYHriuaEOoG4wqMADgHsNpQDbyHDqN+mhVj4cVBEMR+9/c8Twy4eqYmfb59zq6JxBulbLVrJ4divTzaHfdDd39ez7ShpxC0EqsT6KJguHrUBaxRiuv0iXL8kYBsXGG0W68Hf+m0SLPnGTRamOCw//iHNRrlG4inxXWAs4zeDpA7FNDGJkqpmR1FYp8bpEeLzBsXz7DqdhbaU/HbgynbYfjxSM4nxTYdtwSu56DKzq7sKkTOcdUwSBPSEWkLUbsn8w4xPzmeGGKq3G7KiJyTNdIHymQeaQIP/ErRH+5qHeMG9x+HkDBN3kVt6XED5t3pXL2lvjddhHfI3VHPuzvUbY4s3ErKjMwEdjNWuJiciAlzi5qDSfqKXNPHhNAy5R48sGNBU1t8NNf9htAAXtdxvOzCmrAzD474FawtEO01fHbeaXHBwNuuHpxPlHCatNeaJmI719kMNrINKQG0+4REKeqyF79KgVe4tVSZcEdQBox6exBdkSJOMhtoIkPre+O5a8QVgQtnl3wKXLazmz0lKtane8lOcYtq161I81g0KxXjxGi4nrnNss0v4ZkIanfjyTNeLjKyCPtHNCMJmxnmHvnwc11j/ROeDMN+vEnbYjFiz0oW8Wql+roTVhDkpPUyvdocCWfvNg/qmFAYPZlr8/vFvVzmSJZq7gPLE78c8JvxzpyISeAEQ4444rZ2mzDa0P58Fn433Q6Fx0xm9DKcntFjHWkQXrwzmahyAzZlzQ2R9L6DTQ0KLMbKZdNN5SCcJGLRsqNNdtDmcrO2rcpzK0YU1byA+su4BzDNs5iUjqPcK3oKm/J5AkEdD0xsNYPbfqYUIbQSeKVOFLLbCbled2fy/yNR9mzSP1+VS/BYemGKSI2MTfbLrqsfnebvu5hyoQ24p8AVSXohZhtbcY68NU7Ku0twY0YdJ4n1UkoSj8+Ym1Kqg5iJxNOuTI5O+J6x2tUvF+oIc0zqa8I8OITfllzdrZH12MIe6cdu+G0y7DDxGQEDudg7sbPCLHu7gUSDQs5uWLu"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Climate Change in the description  add details what is this"
+    },
+    {
+      "role": "assistant",
+      "content": "### Proposed New Subject Preview\n\n**Title:** Climate Change\n\n**Description:**  \nClimate change refers to **long-term shifts** in temperatures and weather patterns on Earth, primarily driven by **human activities** such as burning fossil fuels, deforestation, and industrial processes.  \n\n**What is it exactly?**  \n- **Causes:** Increased greenhouse gases (e.g., CO₂, methane) trapping heat in the atmosphere, leading to a \"greenhouse effect.\"  \n- **Effects:** Rising global temperatures, melting polar ice caps, more frequent extreme weather (hurricanes, droughts, floods), sea-level rise, biodiversity loss, and threats to food security and human health.  \n- **Timeline:** Observable since the Industrial Revolution, accelerating in recent decades.  \n\nThis subject can now host related **problems** (e.g., \"Ocean Acidification\") and **ideas** (e.g., \"Renewable Energy Solutions\").\n\nDoes this look good? Reply **\"Yes, create it\"** to add it to Needpedia, or suggest changes (e.g., \"Change title to Global Warming\" or \"Add more details about X\"). Let me know! 🌍",
+      "refusal": null,
+      "reasoning": null,
+      "reasoning_details": [
+        {
+          "id": "rs_f611d904-dd12-c305-735e-050bf342601e",
+          "format": "xai-responses-v1",
+          "index": 0,
+          "type": "reasoning.encrypted",
+          "data": "e9OAo0rswu10sjutiin/1uMk9OVS60fVNM3SwCCXL4HRxvsZqN8KV7c34QLGloH+KTFOvFStmyxRIxZqGGHJsvGGKrRwX/6Z/OR4lpw44rW1mb4WJlUj9C6mntgFtKNRD8zkr6+vU+M8akk8hs63QPHycO/w/siLwVyC7VIGnJVsci3n1qnSmikxAhWMdRvD5NKtwxGcMdjeT9lq6IoO5xjdlik6vd25omECysV4zY3GtPkRY2l0SqzZ7Gklj2rcO7cY3ZEduJTCJmvGXJQkjS6IrYa3uoRr74kTakcQTLhKKwiZT/dyvFK66JN1nZyQHHn1gqDEgkeHOlUGX1pUyNyJEUVVf8CKCu6/nIzmSxI/51Lsd8hls2QLmR7xrqco5hApERT+IBcj3IDbrqUhsRZrMXl3bWoSJ6UQwY++YRTTgEYkfnac/lbYN1e+F/QK2lZN0BeeGqIr4bdNC5ZAWAg/aQ8GZsxzFd8jMI/oDNzWPl52QJA6oS5+/Dj0DC02JOK2bH5yj76UvcDo6QnV9ZC+LsHJUx1f+a7yRcu1FXfogtcnFDvYXdj+8C4nm1Inh7fsopxpevEo8hepQLpaoRMPCHRoc5uDicN6DaA7mY7Mdq1FzUrc7h7pQBjaOe9BkWL6so+O6PfQ+QgmTp3cY3W5o7mOJpwpmYJ4YGuGMf5d8OaYtkDkxBwPfz75JaDbCm5rprzJvdPJJRxTG+wqg+rlVP68MwmKLz5kSzG8eKt04wyObrVw1vn1jq5fIGUtrSiFrb2JTwO+JedZPgabUq0XVSA7mCsvsrBHD5egS/uB5nczYRqehIcQjd72ClD16A6fNdyA2CXVOHlD+TYeQ7XRH6qDbm+mAUOt6tY2quRu6Qmb9h7K8xFTi8vZCG56kot3AWm1vWoDFoPZszEX6VHyCjG8I3jMOj+sD/GFSd3olNit55Flj0oaQAL8Y/PUoyYgtzUBVLhWIQxfOmtq02hzQ1fJsazBQO+m6Mu4aUTcas7Enlntic0cIrvPHutzkEv6v9LdBfZtf8MiHb/bMveHzxo+oWrgDYyjJTC9Xt7/IDJkeGB++Ka0lBwgB05MuA+OqzyeTIg4VKZi+OqSLH93ABp6Hc/zDAkCXjneMfRuaKctQQe3L8z12DLsfrRSMJruZyGel/QelWxcSmgkyNrBMWY0snVYWWsQoKvvv7/65eMukN121KwcTijmBxEIWHk8a8nQ17O6+gqq34l6Awr0ppPEZDaeYJ0RRNuH9QjU8Hm7iwCirqnmQjckEAGxO8iPleTb/DjLvQJl0P4EcE/E7p5dxi2OzhdZztFndd9KNffOXlXFI9tZqG7IdDtzwlu3x+ntPRblnj81N0S92RKkjB4oEL9iE1zexOMARDrZavIX/MD65F2eBZgiSrrCYIfVQ6eFIJNQU183Id5LjoXYsK7RuWDy6lKHKqiWP7wMKVu2UPl6k0oRpjGfnqI3T2Nq8JFG6w7oB9NKRtzqvKF0Ix8BmHWvcvT2P1EdDIvgclQgwt1YjXHoXCrotpwiKdCp1xhk966OPnlCPg"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "loopks googd to me"
+    },
+    {
+      "role": "assistant",
+      "content": "Excellent! 🎉 The new **Climate Change** subject has been created successfully.\n\n**View it here:** [Climate Change](https://needpedia.org:3000/posts/26)\n\nWhat would you like to do next?\n1. **Create a problem** under this subject (e.g., \"Rising Sea Levels\")?\n2. **Add an idea** directly to this subject?\n3. **Search or browse more**?\n4. Something else?\n\nLet me know! 😊",
+      "refusal": null,
+      "reasoning": null,
+      "reasoning_details": [
+        {
+          "id": "rs_0a98f0ee-10aa-1fe5-0210-b77ffaa27ad7",
+          "format": "xai-responses-v1",
+          "index": 0,
+          "type": "reasoning.encrypted",
+          "data": "YMTi8OBkdiWSfvtjhZySKAF8TnmTRqSevPJIKz+QWnRUsUufUbxaPZFs9Sp4sXz5cqIUGdU1obi48tP507PsvMKRbKpsrIZ7mCiqPK9V6lFLwCfQgXIfG4kjFj3KNLZeJb3Zu94RRIE7xOi6kDT6tAIASB6IcRB7eeay89xMoWi4OBklzfDGXLsWJKGUHtmaW5E5bzfu5pBSvGQryLPuHo5MyfLl1J9R2g4KUWzMM6AVvdZ3Aqgaa66IGnDKeNMs/7wX9yq7k4PuIY5adOZWD/bD8i4qTIcOqvjcguZp8oBd+V1tjJr8neYWogpUqnAz8JQn1pBuw4L31EkLxWuKwdiIk1qt2OppMu8hJkj9gDFVHObMxV/uAQTgLZKfvBDEAWuj+pvCiUEW/drrSC+yDmThM1Fn7i5+NmiEIBPGS4qEIvHEVVw//FLWaAkwzSf1T2SpNgT+KsFbJG1o0Py+t39Favg4GcXMe9p+gUY1DWCcTPAClTTHTfrMlM3SePY1Q3SYcaVecA5Ayxr4RHD+THQUj0/G9U2aXCXNGe4DLtAiQAuVUTkKm1kibQSmm3dCjfhRmcRV4pDMUNWlgI5hn0cWKfObh4DBNQa2WBlHUBIFyjmFxcRSAr6RE/sOwFth+8XVl69tsu0v"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "is there is any post relted to water"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes! There is a subject on **Water Conservation** already available.\n\n**Quick details:**  \nIt focuses on strategies and challenges for sustainable water use.\n\nWould you like to:\n1. **View more details** or related problems/ideas under Water Conservation?\n2. **Create a new problem or idea** related to water (e.g., under this subject or link it to the new Climate Change one)?\n3. **Connect it to Climate Change** (water scarcity is often climate-related)?\n\nLet me know how to proceed! 💧",
+      "refusal": null,
+      "reasoning": null,
+      "reasoning_details": [
+        {
+          "id": "rs_9e9887f4-f920-9db5-488c-3a713cae19bb",
+          "format": "xai-responses-v1",
+          "index": 0,
+          "type": "reasoning.encrypted",
+          "data": "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"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "can you provide a like"
+    },
+    {
+      "role": "assistant",
+      "content": "Here's the direct link to the **Water Conservation** subject:\n\n[Water Conservation](https://needpedia.org/posts/6)\n\nCheck it out and let me know if you'd like to:\n- Add a **problem** or **idea** under it.\n- Explore related content.\n- Create something new (e.g., \"Water Scarcity and Climate Change\")!\n\nWhat next? 😊",
+      "refusal": null,
+      "reasoning": null,
+      "reasoning_details": [
+        {
+          "id": "rs_e71787f5-4c29-01ff-fd4c-4de1690613bc",
+          "format": "xai-responses-v1",
+          "index": 0,
+          "type": "reasoning.encrypted",
+          "data": "n98iHehWxhqL51sKDR/qOGW9l6ZfCWR3i0/70Q9oNomrSzR6UJZWb2m3LpmiAslgHVpoVlsip5d78OZWNWRYNB+iFWE19fP5JZ7HkvMFMhHU/NnUp9hx8T03sAX9vvABR6QhzxrXt2afVwhawASLDCu6lLD9Ey7H5+3JLGeAS3JL+W5BnnAHnDKXyZZqXKFHOYRS7SL4gcN8HUEWPe6wOLY+tgoHdBB62rMEB1tTs8WF22Pf1pDWy5IZA6hU6E3Ix6e951yyKC3kqkivOwKf9YY0+meofkMtY0V2OYVqW08Smt1aXNYdiysLPZd+Jy86LpcDX643iQdk5mAPXyeEqH3eGkw+j5eZAXQrCkS8nG29NdmKdkMCE4glvtynvDWXfZUjNcVKsuaMHLGZkr/v5/J0f8GBLz1EKQiqf+G0HenCvE4jJnGkLcvmRLwdHIOfuGkRKkDWu8+i5W5hkmW0oLSP+Q"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "is there is problem post attached to it"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes! There is **one problem** attached to the **Water Conservation** subject:\n\n**Title:** Barriers to Effective Water Conservation  \n**Link:** [View here](https://needpedia.org/posts/7)\n\n**Quick summary:** Discusses challenges like lack of awareness, infrastructure issues, and policy gaps hindering water-saving efforts.\n\nWould you like to:\n1. **View details** or add an **idea** to solve this problem?\n2. **Create a new problem** under Water Conservation?\n3. **Link it to Climate Change** or explore more?\n\nLet me know! 🌊",
+      "refusal": null,
+      "reasoning": null,
+      "reasoning_details": [
+        {
+          "id": "rs_3d08b027-d372-10e4-ed17-971588a98bd7",
+          "format": "xai-responses-v1",
+          "index": 0,
+          "type": "reasoning.encrypted",
+          "data": "FTFOuuhdXee9kiJu2497R2gvqum4phsIw5LoT8RmcvXYhxd2E9m9+sMAcaXaFxCyf5bJBKX9LI+vOLbDnq9udDeX3XSoMZ4TwBwDrANz+iKnijEER0EA+qbRcBlIA01tfhPLTeJDy9WMfUjP96gU4VOnLTPzbHDNWSm/dXr9MZBj6eF5qD2dmV2CHm6dOSTRF2D14ambppebUI58MfsjNmXQQrERMQL3Y+LK8SrRCTkVoijQbJ5brlKtApx1Pg8MOrsnxpQ4l6WfT1iHkw+hggXVCfCk+LzpPOUhLZdiKu3lpKEwhzJ9TZl1flvkLomfVTqcSAL+YQ5XuNRWcclA323TqF9zFJYxqE0qCecSVeDy01prRaEc0qpbiGDC3eKcZRpx2r0VT0oHiR9LFiTuaJFNze+Wkgu/0qo2Wg"
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2025-11-20T07:44:41.982Z"
+}
