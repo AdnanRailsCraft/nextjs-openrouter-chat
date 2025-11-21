@@ -47,6 +47,28 @@ const filterReasoning = (content: string): string => {
   return filtered.trim();
 };
 
+// Remove OpenRouter tool-call scaffolding and other autop-run noise
+const stripToolCallArtifacts = (content: string): string => {
+  if (!content) return content;
+  let cleaned = content;
+
+  const fancyToolBlock = /<\uFF5Ctool[^>\uFF5C]*?(?:begin|start)\uFF5C>[\s\S]*?<\uFF5Ctool[^>\uFF5C]*?end\uFF5C>/gi;
+  const asciiToolBlock = /<\|tool[^>|]*?(?:begin|start)\|>[\s\S]*?<\|tool[^>|]*?end\|>/gi;
+  cleaned = cleaned.replace(fancyToolBlock, '');
+  cleaned = cleaned.replace(asciiToolBlock, '');
+
+  const genericToolTags = /<[|\uFF5C][^>]+[|\uFF5C]>/g;
+  cleaned = cleaned.replace(genericToolTags, '');
+
+  // Remove stray "json" blocks that are just tool arguments
+  cleaned = cleaned.replace(/\bjson\b\s*(?:\n|\r\n)\s*\{[\s\S]*?\}\s*(?=(\n|\r\n|$))/gi, '');
+
+  // Collapse consecutive blank lines to keep spacing tidy
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
+};
+
 // Helper function to convert URLs in text to clickable links
 const linkify = (content: string): React.ReactNode => {
   if (!content) return content;
@@ -91,7 +113,7 @@ const linkify = (content: string): React.ReactNode => {
 
 // Ensure we always have some visible assistant content
 const ensureVisibleContent = (raw: string): string => {
-  const initial = raw || '';
+  const initial = stripToolCallArtifacts(raw || '');
   const filtered = filterReasoning(initial);
   if (filtered && filtered.trim().length > 0) return filtered;
   // Fallback: strip any XML-like tags and return text
@@ -104,8 +126,7 @@ const getReasoningContent = (message: Message): string => {
   return typeof candidate === 'string' ? candidate : '';
 };
 
-// Apply basic inline markdown formatting (bold, italic) and linkify
-const applyInlineFormatting = (text: string): React.ReactNode[] => {
+const applyBasicInlineFormatting = (text: string, keyPrefix: string): React.ReactNode[] => {
   if (!text) return [];
   const tokens = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
   const nodes: React.ReactNode[] = [];
@@ -115,24 +136,63 @@ const applyInlineFormatting = (text: string): React.ReactNode[] => {
       const inner = token.slice(2, -2);
       const linked = linkify(inner);
       nodes.push(
-        <strong key={`b-${idx}`}>{linked}</strong>
+        <strong key={`${keyPrefix}-b-${idx}`}>{linked}</strong>
       );
     } else if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
       const inner = token.slice(1, -1);
       const linked = linkify(inner);
       nodes.push(
-        <em key={`i-${idx}`}>{linked}</em>
+        <em key={`${keyPrefix}-i-${idx}`}>{linked}</em>
       );
     } else {
       const linked = linkify(token);
-      // linkify may return string or array
       if (Array.isArray(linked)) {
-        linked.forEach((n, i) => nodes.push(<React.Fragment key={`t-${idx}-${i}`}>{n}</React.Fragment>));
+        linked.forEach((n, i) => nodes.push(<React.Fragment key={`${keyPrefix}-t-${idx}-${i}`}>{n}</React.Fragment>));
       } else {
-        nodes.push(<React.Fragment key={`t-${idx}`}>{linked}</React.Fragment>);
+        nodes.push(<React.Fragment key={`${keyPrefix}-t-${idx}`}>{linked}</React.Fragment>);
       }
     }
   });
+  return nodes;
+};
+
+// Apply inline markdown formatting (bold, italic, links) and linkify bare URLs
+const applyInlineFormatting = (text: string): React.ReactNode[] => {
+  if (!text) return [];
+  const nodes: React.ReactNode[] = [];
+  const linkRegex = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let linkIndex = 0;
+
+  while ((match = linkRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const segment = text.slice(lastIndex, match.index);
+      nodes.push(...applyBasicInlineFormatting(segment, `seg-${lastIndex}`));
+    }
+
+    const label = match[1];
+    const url = match[2];
+    nodes.push(
+      <a
+        key={`md-link-${linkIndex++}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline break-all hover:opacity-80"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {applyBasicInlineFormatting(label, `link-label-${linkIndex}`)}
+      </a>
+    );
+
+    lastIndex = linkRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(...applyBasicInlineFormatting(text.slice(lastIndex), `tail-${lastIndex}`));
+  }
+
   return nodes;
 };
 
