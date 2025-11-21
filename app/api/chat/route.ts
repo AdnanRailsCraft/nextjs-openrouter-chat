@@ -157,6 +157,7 @@ type ToolFunction = (args: FunctionArgs) => Promise<FunctionResult>;
 type ToolMap = Record<'find_content' | 'create_content' | 'edit_content', ToolFunction>;
 
 type ToolResultMessage = Message & { role: 'tool'; tool_call_id: string; name: string };
+type ExecutedToolResult = { name: keyof ToolMap; result: FunctionResult };
 type UsageMetrics = {
   total_tokens?: number;
   total?: number;
@@ -436,6 +437,26 @@ const getFunctions = (userToken?: string): ToolMap => ({
   }
 });
 
+const replacePlaceholderLinksWithToolUrls = (text: string, toolResults: ExecutedToolResult[]): string => {
+  if (!text) return text;
+  const links = toolResults
+    .filter(result => result.name === 'find_content')
+    .flatMap(result => {
+      const items = (result.result as FindContentResult)?.items ?? [];
+      return items
+        .map(item => item.link)
+        .filter((link): link is string => typeof link === 'string' && link.trim().length > 0);
+    });
+  if (links.length === 0) return text;
+
+  let linkIndex = 0;
+  return text.replace(/\[([^\]]+)\]\(#\)/g, (match, label) => {
+    if (linkIndex >= links.length) return match;
+    const url = links[linkIndex++];
+    return `[${label}](${url})`;
+  });
+};
+
 // Define available tools
 const availableTools = [
   {
@@ -640,6 +661,7 @@ export async function POST(req: Request) {
 
     // Handle tool calls iteratively to allow multiple rounds until the model finishes
     const funcs = getFunctions(userToken);
+    const executedToolResults: ExecutedToolResult[] = [];
     let safetyCounter = 0; // prevent infinite loops
     while (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0 && safetyCounter < 5) {
       safetyCounter++;
@@ -679,6 +701,7 @@ export async function POST(req: Request) {
             }
 
             const result = await toolFunction(args);
+            executedToolResults.push({ name: name as keyof ToolMap, result });
 
             const payload = JSON.stringify(result);
             roundMemo.set(roundKey, { name, content: payload });
@@ -756,6 +779,11 @@ export async function POST(req: Request) {
           : 'I\'ve processed your request. Please let me know if you need any additional information.'
       };
     }
+
+    assistantMessage = {
+      ...assistantMessage,
+      content: replacePlaceholderLinksWithToolUrls(assistantMessage.content, executedToolResults)
+    };
 
     // Persist conversation: append incoming user messages and assistant response
     const toAppend: Message[] = [...messages];
