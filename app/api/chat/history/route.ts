@@ -91,11 +91,12 @@ export async function POST(req: Request) {
       conversationId: conversationId
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('History API Error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to get conversation history';
     
     return NextResponse.json(
-      { error: error.message || 'Failed to get conversation history' },
+      { error: message },
       { status: 500 }
     );
   }

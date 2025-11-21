@@ -43,7 +43,7 @@ export default function Home() {
   useEffect(() => {
     try {
       window.localStorage.setItem('np_sidebar_open', showSidebar ? 'true' : 'false');
-    } catch (_) {}
+    } catch {}
   }, [showSidebar]);
 
   // Close on Escape key
@@ -68,7 +68,7 @@ export default function Home() {
     if (mounted && typeof window !== 'undefined' && window.innerWidth < 768) {
       setShowSidebar(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [pathname, searchParams, mounted]);
 
   const handleNewChat = () => {
@@ -80,23 +80,14 @@ export default function Home() {
   };
 
   const handleConversationChange = (conversationId: string, title: string, lastMessage: string) => {
-    console.log('Main: Received conversation change:', { conversationId, title, lastMessage });
     // Update the current conversation ID
     setCurrentConversationId(conversationId);
     
     // Add to chat history in sidebar
     if (sidebarRef.current) {
-      console.log('Main: Calling sidebar addToHistory');
       sidebarRef.current.addToHistory(conversationId, title, lastMessage);
-    } else {
-      console.log('Main: Sidebar ref not available');
     }
   };
-
-  // Debug: Log when component mounts
-  useEffect(() => {
-    console.log('Main: Component mounted with userId:', userId);
-  }, [userId]);
 
   // If URL locks sidebar off, show only the chat panel
   if (sidebarLockedOff) {

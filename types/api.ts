@@ -15,5 +15,5 @@ export interface ContentData {
 
 export interface APIError {
   error: string;
-  details?: any;
+  details?: unknown;
 }

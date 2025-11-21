@@ -1,10 +1,15 @@
-import { APIError, ToolCall } from '@/types/api';
+import { ToolCall } from '@/types/api';
 
-export const makeAPIRequest = async (url: string, method: string, token: string | null, body?: any) => {
+export const makeAPIRequest = async (
+  url: string,
+  method: string,
+  token: string | null,
+  body?: Record<string, unknown>
+): Promise<unknown> => {
   try {
     console.log(`Making ${method} request to: ${url}`);
 
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
 
@@ -31,7 +36,7 @@ export const makeAPIRequest = async (url: string, method: string, token: string 
     const data = await response.json();
     console.log('API Response:', data);
     return data;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Request error:', error);
     throw error;
   }
@@ -49,15 +54,26 @@ export const handleToolCall = async (
 
   try {
     if (toolCall?.function?.name === "find_content") {
-      const { query, type } = JSON.parse(toolCall.function.arguments);
-      const url = new URL(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/posts`);
-      url.searchParams.append('type', type);
+      const parsed = JSON.parse(toolCall.function.arguments) as {
+        query?: unknown;
+        type?: unknown;
+      };
+      const query = typeof parsed.query === 'string' ? parsed.query : '';
+      const contentType = typeof parsed.type === 'string' ? parsed.type : 'all';
+      if (!query) {
+        setError('Search query is required for find_content');
+        return;
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+      const url = new URL(`${baseUrl}/api/v1/posts`);
+      url.searchParams.append('type', contentType);
       url.searchParams.append('q[title_cont]', query);
 
       const data = await makeAPIRequest(url.toString(), 'GET', token);
       return JSON.stringify(data);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Tool call handler error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     setError(errorMessage);
