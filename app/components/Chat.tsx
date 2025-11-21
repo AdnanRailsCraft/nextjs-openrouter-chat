@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Message } from '@/types/chat';
-import { ToolCall } from '@/types/api';
 
 interface ChatProps {
-  toolCallHandler?: (toolCall: ToolCall) => Promise<string | undefined>;
   conversationId?: string;
   onConversationChange?: (conversationId: string, title: string, lastMessage: string) => void;
   noBorder?: boolean;
@@ -99,6 +97,11 @@ const ensureVisibleContent = (raw: string): string => {
   // Fallback: strip any XML-like tags and return text
   const stripped = initial.replace(/<[^>]+>/g, '').trim();
   return stripped;
+};
+
+const getReasoningContent = (message: Message): string => {
+  const candidate = (message as Record<string, unknown>).reasoning;
+  return typeof candidate === 'string' ? candidate : '';
 };
 
 // Apply basic inline markdown formatting (bold, italic) and linkify
@@ -231,8 +234,8 @@ const persistChatThread = async (
       },
       body: JSON.stringify(body),
     });
-  } catch (error) {
-    console.warn('Failed to persist chat thread metadata', error);
+  } catch {
+    // Ignore persistence failures
   }
 };
 
@@ -267,12 +270,12 @@ const persistChatMessages = async (
       },
       body: JSON.stringify(body),
     });
-  } catch (error) {
-    console.warn('Failed to persist chat messages', error);
+  } catch {
+    // Ignore persistence failures
   }
 };
 
-export default function Chat({ toolCallHandler, conversationId, onConversationChange, noBorder = false, userId }: ChatProps) {
+export default function Chat({ conversationId, onConversationChange, noBorder = false, userId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -280,18 +283,37 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(conversationId);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Debug: Log when component mounts and props change
-  useEffect(() => {
-    console.log('Chat: Component mounted/updated with props:', { 
-      conversationId, 
-      hasOnConversationChange: !!onConversationChange 
-    });
-  }, [conversationId, onConversationChange]);
+  const loadConversationHistory = useCallback(async (id: string) => {             
+    try {
+      const response = await fetch('/api/chat/history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ conversationId: id, userToken: userId || undefined }),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as { messages?: Message[] };
+        // Filter out thinking/reasoning content from all assistant messages
+        const filteredMessages = (data.messages ?? []).map((msg: Message) => {
+          if (msg.role !== 'assistant') return msg;
+          const rawContent = msg.content || getReasoningContent(msg);
+          return { ...msg, content: ensureVisibleContent(rawContent) };
+        });
+        
+        setMessages(filteredMessages);
+      } else {
+        setMessages([]);
+      }
+    } catch {
+      setMessages([]);
+    }
+  }, [userId]);
 
   // Reset messages when conversation changes
   useEffect(() => {
     if (conversationId !== currentConversationId) {
-      console.log('Chat: Conversation changed from', currentConversationId, 'to', conversationId);
       if (conversationId) {
         // Load conversation history from server
         loadConversationHistory(conversationId);
@@ -301,52 +323,18 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
       }
       setCurrentConversationId(conversationId);
     }
-  }, [conversationId, currentConversationId, userId]);
+  }, [conversationId, currentConversationId, loadConversationHistory]);
 
   // Auto-scroll to the bottom when messages change
   useEffect(() => {
     try {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    } catch (_) {}
+    } catch {
+      // No-op if scrolling fails
+    }
   }, [messages, isLoading]);
 
-  const loadConversationHistory = async (conversationId: string) => {             
-    try {
-      console.log('Chat: Loading conversation history for', conversationId);
-      // For now, we'll use the server-side memory to get conversation history
-      // The server already stores conversation history in the conversationStore
-      // We need to make a request to get the conversation history
-      const response = await fetch('/api/chat/history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ conversationId, userToken: userId || undefined }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Chat: Loaded conversation history:', data.messages);
-        
-        // Filter out thinking/reasoning content from all assistant messages
-        const filteredMessages = data.messages?.map((msg: Message) => {
-          if (msg.role !== 'assistant') return msg;
-          const rawContent = msg.content || (msg as any)?.reasoning || '';
-          return { ...msg, content: ensureVisibleContent(rawContent) };
-        }) || [];
-        
-        setMessages(filteredMessages);
-      } else {
-        console.log('Chat: No conversation history found, starting fresh');
-        setMessages([]);
-      }
-    } catch (error) {
-      console.error('Chat: Error loading conversation history:', error);
-      setMessages([]);
-    }
-  };
-
-  const sendMessage = async (userMessage: Message) => {
+  const sendMessage = useCallback(async (userMessage: Message) => {
     setError('');
     try {
       const response = await fetch('/api/chat', {
@@ -361,7 +349,12 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
         }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        choices: Array<{ message: Message & { reasoning?: string } }>;
+        conversationId?: string;
+        usedTokens?: number;
+        error?: string | { message?: string };
+      };
       
       if (!response.ok) {
         const errorMessage = typeof data.error === 'string' 
@@ -370,11 +363,11 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
         throw new Error(errorMessage);
       }
 
-      let assistantMessage = data.choices[0].message;
+      let assistantMessage = data.choices[0].message as Message & { reasoning?: string };
 
       // Normalize assistant content: fall back to reasoning if content is empty
       if (assistantMessage?.role === 'assistant') {
-        const rawContent = assistantMessage.content || (assistantMessage as any)?.reasoning || '';
+        const rawContent = assistantMessage.content || getReasoningContent(assistantMessage);
         assistantMessage = {
           ...assistantMessage,
           content: ensureVisibleContent(rawContent)
@@ -404,7 +397,9 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
       }
       
       // Append only the assistant message because the user message was optimistically added
-      setMessages(prev => [...prev, assistantMessage]);
+      if (assistantMessage) {
+        setMessages(prev => [...prev, assistantMessage]);
+      }
 
       // Notify sidebar about token usage to update HP bar immediately
       try {
@@ -412,7 +407,7 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
         if (!isNaN(used) && used > 0) {
           window.dispatchEvent(new CustomEvent('np_tokens_used', { detail: { used } }));
         }
-      } catch (_) {}
+      } catch {}
 
       // Update conversation ID if it's new
       if (data.conversationId && data.conversationId !== currentConversationId) {
@@ -429,18 +424,17 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
         const title = sidebarTitle || userMessage.content;
         const filteredContent = assistantVisibleContent;
         const lastMessage = sidebarLastMessage || filteredContent;
-        console.log('Chat: Notifying conversation change:', { conversationId: data.conversationId, title, lastMessage });
         onConversationChange(data.conversationId, title, lastMessage);
       }
 
-    } catch (err: any) {
-      console.error('Chat error:', err);
-      setError(err.message || 'Failed to send message. Please try again.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
+      setError(message);
     }
-  };
+  }, [currentConversationId, onConversationChange, userId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(async (e?: React.FormEvent | KeyboardEvent) => {
+    e?.preventDefault();
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -452,13 +446,12 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
     setIsLoading(true);
     try {
       // Optimistically render the user's message immediately
-      const nextMessages = [...messages, userMessage];
-      setMessages(nextMessages);
+      setMessages(prev => [...prev, userMessage]);
       await sendMessage(userMessage);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [input, isLoading, sendMessage]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -466,9 +459,7 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
       // Ctrl/Cmd + Enter to send message
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (input.trim() && !isLoading) {
-          handleSubmit(e as any);
-        }
+        handleSubmit(e);
       }
       // Escape to clear input
       if (e.key === 'Escape') {
@@ -478,7 +469,7 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [input, isLoading]);
+  }, [handleSubmit]);
 
   return (
     <div className={`flex flex-col h-full bg-gray-50 ${noBorder ? '' : 'rounded-lg shadow-xl border border-gray-200'}`}>
@@ -498,7 +489,7 @@ export default function Chat({ toolCallHandler, conversationId, onConversationCh
               </svg>
               Welcome to Needpedia!
             </p>
-            <p className="mt-2 text-sm sm:text-base">I'm Lotte, your AI librarian. I can help you create ideas, browse content, and navigate Needpedia.</p>
+            <p className="mt-2 text-sm sm:text-base">I&apos;m Lotte, your AI librarian. I can help you create ideas, browse content, and navigate Needpedia.</p>
             <p className="mt-4 text-xs sm:text-sm font-medium flex items-center justify-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />

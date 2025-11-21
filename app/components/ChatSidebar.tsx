@@ -9,6 +9,10 @@ interface ChatHistory {
   timestamp: Date;
 }
 
+interface StoredChatHistory extends Omit<ChatHistory, 'timestamp'> {
+  timestamp: string;
+}
+
 interface ChatSidebarProps {
   onNewChat: () => void;
   onSelectChat: (conversationId: string) => void;
@@ -21,11 +25,8 @@ export interface ChatSidebarRef {
 }
 
 const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(({ onNewChat, onSelectChat, currentConversationId, userId }, ref) => {
-  const defaultTokens = Number(process.env.NEXT_PUBLIC_TOKENS_DEFAULT || process.env.NEXT_PUBLIC_TOKENS_MAX || 100);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [tokensCount, setTokensCount] = useState<number | null>(defaultTokens);
-  const [tokensError, setTokensError] = useState<string>('');
 
   // Load chat history from localStorage on mount - user-specific
   useEffect(() => {
@@ -37,13 +38,13 @@ const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(({ onNewChat, o
     console.log('Sidebar: Found saved history:', savedHistory);
     if (savedHistory) {
       try {
-        const parsed = JSON.parse(savedHistory).map((item: any) => ({
+        const parsed = (JSON.parse(savedHistory) as StoredChatHistory[]).map((item) => ({
           ...item,
           timestamp: new Date(item.timestamp)
         }));
         console.log('Sidebar: Parsed history:', parsed);
         setChatHistory(parsed);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error parsing chat history:', error);
       }
     }
@@ -66,8 +67,8 @@ const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(({ onNewChat, o
           console.warn('Sidebar: Failed to load backend chat threads');
           return;
         }
-        const data = await resp.json().catch(() => ({ threads: [] }));
-        const threads: string[] = Array.isArray(data?.threads) ? data.threads : [];
+        const data = (await resp.json().catch(() => ({ threads: [] }))) as { threads?: unknown };
+        const threads = Array.isArray(data?.threads) ? data.threads.filter((id): id is string => typeof id === 'string') : [];
 
         if (threads.length === 0) return;
 
@@ -84,8 +85,8 @@ const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(({ onNewChat, o
             }));
           return additions.length ? [...additions, ...prev] : prev;
         });
-      } catch (e) {
-        console.warn('Sidebar: Error loading backend chat threads', e);
+      } catch (error: unknown) {
+        console.warn('Sidebar: Error loading backend chat threads', error);
       }
     };
 
@@ -166,6 +167,20 @@ const ChatSidebar = forwardRef<ChatSidebarRef, ChatSidebarProps>(({ onNewChat, o
               Chat History
             </h2>
           )}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(prev => !prev)}
+            className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-600"
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isCollapsed ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              )}
+            </svg>
+          </button>
         </div>
       </div>
 

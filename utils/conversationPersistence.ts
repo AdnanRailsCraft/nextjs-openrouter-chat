@@ -7,9 +7,13 @@ const conversationsDir = path.join(process.cwd(), 'data', 'conversations');
 const ensureDir = async () => {
   try {
     await fs.mkdir(conversationsDir, { recursive: true });
-  } catch (error) {
-    console.error('[ConversationPersistence] Failed to ensure directory', error);
+  } catch {
+    // Ignore directory creation errors
   }
+};
+
+const isErrnoException = (error: unknown): error is NodeJS.ErrnoException => {
+  return typeof error === 'object' && error !== null && 'code' in error;
 };
 
 export interface StoredConversation {
@@ -28,8 +32,8 @@ export const saveConversationToDisk = async (conversationId: string, messages: M
     };
     const filePath = path.join(conversationsDir, `${conversationId}.json`);
     await fs.writeFile(filePath, JSON.stringify(payload, null, 2), 'utf-8');
-  } catch (error) {
-    console.error(`[ConversationPersistence] Failed to save conversation ${conversationId}`, error);
+  } catch {
+    // Ignore save failures
   }
 };
 
@@ -42,9 +46,10 @@ export const loadConversationFromDisk = async (conversationId: string): Promise<
       return parsed.messages as Message[];
     }
     return null;
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
-      console.error(`[ConversationPersistence] Failed to load conversation ${conversationId}`, error);
+  } catch (error: unknown) {
+    const isMissingFile = isErrnoException(error) && error.code === 'ENOENT';
+    if (!isMissingFile) {
+      // Ignore other failures silently
     }
     return null;
   }

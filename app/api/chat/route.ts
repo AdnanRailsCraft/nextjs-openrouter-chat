@@ -5,7 +5,6 @@ import axios from 'axios';
 import { conversationStore } from '@/utils/memory';
 import { saveConversationToDisk } from '@/utils/conversationPersistence';
 import { randomUUID } from 'crypto';
-import { ToolCall } from '@/types/api';
 import http from 'http';
 import https from 'https';
 
@@ -15,7 +14,7 @@ const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
 
 // Short-lived cache for tool results to avoid duplicate backend calls
 // Keyed by `${toolName}|${stableArgs}`
-const toolResultCache: Map<string, { expiryMs: number; payload: any }> = new Map();
+const toolResultCache: Map<string, { expiryMs: number; payload: unknown }> = new Map();
 const TOOL_CACHE_TTL_MS = 5_000; // 5 seconds dedupe window
 
 const openRouterClient = axios.create({
@@ -115,6 +114,72 @@ interface EditContentResult {
 
 type FunctionResult = FindContentResult | CreateContentResult | EditContentResult;
 
+interface NeedpediaPost {
+  id?: string | number;
+  title?: string;
+  post_type?: string;
+  link?: string;
+  url?: string;
+  post_url?: string;
+}
+
+type NeedpediaContentBuckets = Partial<Record<'subjects' | 'problems' | 'ideas', NeedpediaPost[]>> & Record<string, NeedpediaPost[] | undefined>;
+interface CreatePostPayload {
+  post: {
+    title: string;
+    post_type: string;
+    content: {
+      body: string;
+    };
+    subject_id?: string;
+    problem_id?: string;
+  };
+}
+
+interface UpdatePostPayload {
+  post: Record<string, unknown>;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const isNeedpediaPost = (value: unknown): value is NeedpediaPost => {
+  if (!isRecord(value)) return false;
+  return typeof value.title === 'string' || typeof value.post_type === 'string';
+};
+
+const normalizePostArray = (value: unknown): NeedpediaPost[] => {
+  return Array.isArray(value) ? value.filter(isNeedpediaPost) : [];
+};
+
+type ToolFunction = (args: FunctionArgs) => Promise<FunctionResult>;
+type ToolMap = Record<'find_content' | 'create_content' | 'edit_content', ToolFunction>;
+
+type ToolResultMessage = Message & { role: 'tool'; tool_call_id: string; name: string };
+type UsageMetrics = {
+  total_tokens?: number;
+  total?: number;
+  completion_tokens?: number;
+};
+type UsageEnvelope = { usage?: UsageMetrics };
+type ErrorPayload = { error?: string | { message?: string } };
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
+const extractTokenCount = (usage?: UsageMetrics): number => {
+  if (!usage) return 0;
+  const total = usage.total_tokens ?? usage.total ?? usage.completion_tokens ?? 0;
+  return Number.isFinite(total) ? Number(total) : 0;
+};
+
 const isFindContentArgs = (args: FunctionArgs): args is FindContentArgs => {
   return 'query' in args;
 };
@@ -126,9 +191,6 @@ const isCreateContentArgs = (args: FunctionArgs): args is CreateContentArgs => {
 const isEditContentArgs = (args: FunctionArgs): args is EditContentArgs => {
   return 'content_id' in args && 'changes' in args;
 };
-
-// Store for user tokens (in a real app, use a more secure storage)
-const userTokens: Map<string, string> = new Map();
 
 // Convert simple Markdown/plain text to minimal HTML suitable for rich text fields
 const toRichHtml = (input: string): string => {
@@ -192,52 +254,24 @@ const htmlToPlainText = (html: string): string => {
   return text.trim();
 };
 
-const logContentPreview = (label: string, content?: string) => {
-  const text = (content || '').trim();
-  if (!text) {
-    console.log(`   ${label}: <empty>`);
-    return;
-  }
-  const maxLength = 600;
-  const truncated = text.length > maxLength;
-  const preview = truncated ? `${text.slice(0, maxLength)}…` : text;
-  console.log(`   ${label} (${text.length} chars):`);
-  preview.split('\n').forEach(line => console.log(`      ${line}`));
-  if (truncated) {
-    console.log(`      …(truncated)`);
-  }
-};
-
-const getFunctions = (userToken?: string, token?: string) => ({
+const getFunctions = (userToken?: string): ToolMap => ({
   'find_content': async (args: FunctionArgs): Promise<FindContentResult> => {
     if (!isFindContentArgs(args)) {
       throw new Error('Invalid arguments for content search');
     }
-    
-    // Default to "all" if type is not specified
-    const postType = args.type || 'all';
-    
-    console.log(`\n🔍 [find_content] Starting search`);
-    console.log(`   Query: "${args.query}"`);
-    console.log(`   Type: "${postType}"`);
-    console.log(`   User Token: ${userToken ? 'Present' : 'Not provided'}`);
-    
-    // In-memory dedupe to prevent repeated identical calls in quick succession
-    const stableArgs = JSON.stringify({ query: args.query || '', type: postType.toLowerCase() });
+
+    const postType = (args.type || 'all').toLowerCase();
+    const stableArgs = JSON.stringify({ query: args.query || '', type: postType });
     const cacheKey = `find_content|${stableArgs}`;
     const now = Date.now();
     const cached = toolResultCache.get(cacheKey);
     if (cached && cached.expiryMs > now) {
-      console.log(`   🗂️ Using cached result for find_content`);
       return cached.payload as FindContentResult;
     }
-    
-    // Make API call to Needpedia backend
+
     const url = new URL(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/v1/posts`);
     url.searchParams.append('type', postType);
     url.searchParams.append('q[title_cont]', args.query);
-
-    console.log(`   🔗 API URL: ${url.toString()}`);
 
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -245,57 +279,41 @@ const getFunctions = (userToken?: string, token?: string) => ({
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.POST_TOKEN || ''}`,
         ...(userToken ? { 'token': userToken } : {})
-      },
+      }
     });
 
-    console.log(`   📡 Response status: ${response.status} ${response.statusText}`);
-
+    const payload = await response.json().catch(() => ({} as { message?: string; content?: unknown }));
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error(`   ❌ API error:`, errorData);
-      throw new Error(`API request failed: ${response.status} - ${errorData.message || response.statusText}`);
+      throw new Error(`API request failed: ${response.status} - ${payload?.message || response.statusText}`);
     }
 
-    const data = await response.json();
-    const t = postType.toLowerCase();
-    let source: any[] = [];
-
-    // Support both response shapes:
-    // 1) { status, message, content: [ ...items ] }
-    // 2) { status, message, content: { subjects: [], problems: [], ideas: [] } }
-    const content = data?.content;
+    const content = payload?.content;
+    let source: NeedpediaPost[] = [];
     if (Array.isArray(content)) {
-      source = content;
-    } else if (content && typeof content === 'object') {
-      if (t === 'problem' || t === 'problems') {
-        source = Array.isArray((content as any).problems) ? (content as any).problems : [];
-      } else if (t === 'idea' || t === 'ideas') {
-        source = Array.isArray((content as any).ideas) ? (content as any).ideas : [];
+      source = normalizePostArray(content);
+    } else if (isRecord(content)) {
+      const bucket = content as NeedpediaContentBuckets;
+      if (postType === 'problem' || postType === 'problems') {
+        source = normalizePostArray(bucket.problems);
+      } else if (postType === 'idea' || postType === 'ideas') {
+        source = normalizePostArray(bucket.ideas);
       } else {
-        source = Array.isArray((content as any).subjects) ? (content as any).subjects : [];
+        source = normalizePostArray(bucket.subjects);
       }
-      // Fallback: if specific buckets are empty but content object looks like a flat item
-      if (!Array.isArray(source) || source.length === 0) {
-        // Some backends may return a single item object; normalize to array
-        if (content && !Array.isArray(content)) {
-          const maybeArray = (Object.values(content as any).find(v => Array.isArray(v)) as any[]) || [];
-          if (maybeArray.length > 0) {
-            source = maybeArray;
-          }
-        }
+
+      if (source.length === 0) {
+        const fallbackArray = Object.values(bucket).find(Array.isArray);
+        source = normalizePostArray(fallbackArray);
       }
-    } else {
-      source = [];
     }
 
-    const items = source.map((item: any) => ({
-      title: item.title,
-      type: item.post_type || t,
-      id: item.id,
+    const items = source.map((item): FindContentResult['items'][number] => ({
+      title: item.title || 'Untitled',
+      type: item.post_type || postType,
+      id: item.id !== undefined ? String(item.id) : undefined,
       link: item.link || item.url || item.post_url || undefined
     }));
-    
-    console.log(`   ✅ Found ${items.length} items`);
+
     const result: FindContentResult = { items };
     toolResultCache.set(cacheKey, { expiryMs: now + TOOL_CACHE_TTL_MS, payload: result });
     return result;
@@ -304,12 +322,6 @@ const getFunctions = (userToken?: string, token?: string) => ({
     if (!isCreateContentArgs(args)) {
       throw new Error('Invalid arguments for content creation');
     }
-
-    console.log(`\n✍️  [create_content] Creating new post`);
-    console.log(`   Title: "${args.title}"`);
-    console.log(`   Type: "${args.content_type}"`);
-    console.log(`   Parent ID: ${args.parent_id || 'None'}`);
-    console.log(`   User Token: ${userToken ? 'Present' : 'Not provided'}`);
 
     const htmlBody = toRichHtml(args.description || '');
     const plainText = htmlToPlainText(htmlBody);
@@ -323,10 +335,6 @@ const getFunctions = (userToken?: string, token?: string) => ({
     };
 
     if (!args.confirm) {
-      console.log(`   ⚠️  Confirmation not provided. Returning preview instead of creating post.`);
-      logContentPreview('Raw description', args.description);
-      logContentPreview('HTML body preview', htmlBody);
-      logContentPreview('Plain text preview', plainText);
       return {
         requires_confirmation: true,
         preview: previewPayload,
@@ -334,31 +342,23 @@ const getFunctions = (userToken?: string, token?: string) => ({
       };
     }
 
-    logContentPreview('Raw description', args.description);
-
-    const postData: any = {
+    const postData: CreatePostPayload = {
       post: {
         title: args.title || '',
         post_type: args.content_type || '',
         content: {
-          // Backend expects rich text; convert description to HTML
           body: htmlBody
         }
       }
     };
-    logContentPreview('HTML body preview', postData.post.content.body);
-    logContentPreview('Plain text preview', plainText);
 
-    if (args.content_type === "problem" && args.parent_id) {
+    if (args.content_type === 'problem' && args.parent_id) {
       postData.post.subject_id = args.parent_id;
-    } else if (args.content_type === "idea" && args.parent_id) {
+    } else if (args.content_type === 'idea' && args.parent_id) {
       postData.post.problem_id = args.parent_id;
     }
 
-    console.log(`   📦 Request body:`, JSON.stringify(postData, null, 2));
     const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/v1/posts`;
-    console.log(`   🔗 API URL: ${apiUrl}`);
-
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -369,20 +369,13 @@ const getFunctions = (userToken?: string, token?: string) => ({
       body: JSON.stringify(postData)
     });
 
-    console.log(`   📡 Response status: ${response.status} ${response.statusText}`);
-
+    const payload = await response.json().catch(() => ({} as { message?: string; content?: { post?: CreateContentResult['post'] } }));
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error(`   ❌ API error:`, errorData);
-      throw new Error(`API request failed: ${response.status} - ${errorData.message || response.statusText}`);
+      throw new Error(`API request failed: ${response.status} - ${payload?.message || response.statusText}`);
     }
 
-    const data = await response.json();
-    console.log(`   ✅ Post created successfully`);
-    console.log(`   📝 Post data:`, JSON.stringify(data.content?.post, null, 2));
-    
     return {
-      post: data.content.post
+      post: payload.content?.post
     };
   },
   'edit_content': async (args: FunctionArgs): Promise<EditContentResult> => {
@@ -392,13 +385,6 @@ const getFunctions = (userToken?: string, token?: string) => ({
 
     const { content_id, changes } = args;
     const { title, description } = changes;
-
-    console.log(`\n✏️  [edit_content] Editing post`);
-    console.log(`   Post ID: ${content_id}`);
-    console.log(`   New title: ${title || 'Unchanged'}`);
-    console.log(`   New description: ${description ? 'Updated' : 'Unchanged'}`);
-    console.log(`   User Token: ${userToken ? 'Present' : 'Not provided'}`);
-
     const html = description ? toRichHtml(description) : undefined;
     const plainText = html ? htmlToPlainText(html) : undefined;
     const previewPayload = {
@@ -410,12 +396,6 @@ const getFunctions = (userToken?: string, token?: string) => ({
     };
 
     if (!args.confirm) {
-      console.log(`   ⚠️  Confirmation not provided. Returning edit preview instead of updating post.`);
-      if (description) {
-        logContentPreview('New description (raw)', description);
-        logContentPreview('New description (HTML)', html);
-        logContentPreview('New description (plain text)', plainText);
-      }
       return {
         requires_confirmation: true,
         preview: previewPayload,
@@ -423,24 +403,17 @@ const getFunctions = (userToken?: string, token?: string) => ({
       };
     }
 
-    const postData: any = {
+    const postData: UpdatePostPayload = {
       post: {}
     };
 
     if (title) postData.post.title = title;
-    if (description) {
+    if (description && html) {
       postData.post.content = { body: html };
-      // Some backends expect nested attributes naming
       postData.post.content_attributes = { body: html };
-      logContentPreview('New description (raw)', description);
-      logContentPreview('New description (HTML)', html);
-      logContentPreview('New description (plain text)', plainText);
     }
 
-    console.log(`   📦 Request body:`, JSON.stringify(postData, null, 2));
     const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/posts/${content_id}/api_update`;
-    console.log(`   🔗 API URL: ${apiUrl}`);
-
     const response = await fetch(apiUrl, {
       method: 'PUT',
       headers: {
@@ -452,20 +425,13 @@ const getFunctions = (userToken?: string, token?: string) => ({
       body: JSON.stringify(postData)
     });
 
-    console.log(`   📡 Response status: ${response.status} ${response.statusText}`);
-
+    const payload = await response.json().catch(() => ({} as { message?: string; content?: { post?: EditContentResult['post'] } }));
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error(`   ❌ API error:`, errorData);
-      throw new Error(`API request failed: ${response.status} - ${errorData.message || response.statusText}`);
+      throw new Error(`API request failed: ${response.status} - ${payload?.message || response.statusText}`);
     }
 
-    const data = await response.json();
-    console.log(`   ✅ Post updated successfully`);
-    console.log(`   📝 Updated post:`, JSON.stringify(data.content?.post, null, 2));
-    
     return {
-      post: data.content.post
+      post: payload.content?.post
     };
   }
 });
@@ -565,15 +531,15 @@ const availableTools = [
 
 export async function POST(req: Request) {
   try {
-    const { messages = [], conversationId, userToken } = await req.json();
-
-    console.log('Chat API Request:', { 
-      messageCount: messages?.length, 
+    const {
+      messages = [],
       conversationId,
-      hasApiKey: !!process.env.OPENROUTER_API_KEY,
-      apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
-      hasUserToken: !!userToken
-    });
+      userToken
+    } = await req.json() as {
+      messages?: Message[];
+      conversationId?: string;
+      userToken?: string;
+    };
 
     const id: string = conversationId || randomUUID();
 
@@ -601,12 +567,12 @@ export async function POST(req: Request) {
         });
 
         if (!tokensResp.ok) {
-          const err = await tokensResp.json().catch(() => ({} as any));
+          const err = (await tokensResp.json().catch(() => ({}))) as { message?: string };
           const msg = err?.message || 'Insufficient tokens';
           return NextResponse.json({ error: msg, tokens: 0 }, { status: 402 });
         }
 
-        const tokensData = await tokensResp.json().catch(() => ({} as any));
+        const tokensData = (await tokensResp.json().catch(() => ({}))) as { tokens?: number };
         const remaining = tokensData?.tokens ?? 0;
         if (!remaining || remaining <= 0) {
           return NextResponse.json({ error: 'Insufficient tokens', tokens: 0 }, { status: 402 });
@@ -614,8 +580,7 @@ export async function POST(req: Request) {
         // Cache positive result for 60s
         tokenCheckCache.set(userToken, { expiryMs: now + 60_000, remaining });
       }
-    } catch (e: any) {
-      console.error('Token check error:', e);
+    } catch (e: unknown) {
       return NextResponse.json({ error: 'Token verification failed' }, { status: 500 });
     }
 
@@ -643,8 +608,6 @@ export async function POST(req: Request) {
     // Use the model from environment variable, fallback to default
     const model = process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free';
     
-    console.log(`Using model: ${model}`);
-
     // Track total tokens used across one logical response
     let usedTokens = 0;
 
@@ -661,21 +624,13 @@ export async function POST(req: Request) {
       extra_body: {},
     });
 
-    console.log('OpenRouter Response:', {
-      hasChoices: !!response.data?.choices,
-      choiceCount: response.data?.choices?.length,
-      message: response.data?.choices?.[0]?.message,
-      hasToolCalls: !!response.data?.choices?.[0]?.message?.tool_calls
-    });
-
     // Capture usage from first call if present
     try {
-      const usage = (response.data as any)?.usage;
-      if (usage) {
-        const total = Number(usage.total_tokens || usage.total || usage.completion_tokens || 0);
-        usedTokens += isNaN(total) ? 0 : total;
-      }
-    } catch (_) {}
+      const usage = (response.data as UsageEnvelope)?.usage;
+      usedTokens += extractTokenCount(usage);
+    } catch {
+      // Ignore usage parsing errors
+    }
 
     if (!response.data?.choices?.[0]?.message) {
       throw new Error('Invalid response from OpenRouter API');
@@ -688,9 +643,8 @@ export async function POST(req: Request) {
     let safetyCounter = 0; // prevent infinite loops
     while (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0 && safetyCounter < 5) {
       safetyCounter++;
-      console.log(`\n🔧 Tool Calls Detected: Processing ${assistantMessage.tool_calls.length} tool call(s)`);
       const toolCalls = assistantMessage.tool_calls;
-      const toolResults: any[] = [];
+      const toolResults: ToolResultMessage[] = [];
       // Per-round dedupe to avoid executing the same tool with identical args more than once
       const roundMemo = new Map<string, { name: string; content: string }>();
 
@@ -698,57 +652,52 @@ export async function POST(req: Request) {
         const toolCall = toolCalls[i];
         const { name, arguments: argsString } = toolCall.function;
 
-        console.log(`\n📞 Function Call #${i + 1}:`);
-        console.log(`  Function Name: ${name}`);
-        console.log(`  Tool Call ID: ${toolCall.id}`);
-        console.log(`  Arguments: ${argsString}`);
-
-        const args = JSON.parse(argsString || '{}');
+        const args = JSON.parse(argsString || '{}') as FunctionArgs;
         const stableArgs = JSON.stringify(args);
         const roundKey = `${name}|${stableArgs}`;
 
         try {
           if (roundMemo.has(roundKey)) {
-            console.log(`  ♻️ Reusing result for duplicate call: ${name}`);
             const cached = roundMemo.get(roundKey)!;
             toolResults.push({
               tool_call_id: toolCall.id,
-              role: 'tool' as const,
+              role: 'tool',
               name: cached.name,
               content: cached.content
             });
           } else {
-            console.log(`  ➡️  Calling function: ${name}`);
-            console.log(`  📝 Function arguments:`, JSON.stringify(args, null, 2));
+            const toolFunction = funcs[name as keyof typeof funcs];
+            if (!toolFunction) {
+              const unsupportedPayload = JSON.stringify({ error: `Unsupported tool: ${name}` });
+              toolResults.push({
+                tool_call_id: toolCall.id,
+                role: 'tool',
+                name,
+                content: unsupportedPayload
+              });
+              continue;
+            }
 
-            const startTime = Date.now();
-            const result = await (funcs as any)[name](args);
-            const duration = Date.now() - startTime;
-
-            console.log(`  ✅ Function '${name}' completed successfully in ${duration}ms`);
-            console.log(`  📤 Result:`, JSON.stringify(result, null, 2));
+            const result = await toolFunction(args);
 
             const payload = JSON.stringify(result);
             roundMemo.set(roundKey, { name, content: payload });
             toolResults.push({
               tool_call_id: toolCall.id,
-              role: 'tool' as const,
+              role: 'tool',
               name,
               content: payload
             });
           }
-        } catch (error: any) {
-          console.error(`  ❌ Error executing function '${name}':`, error);
+        } catch (error: unknown) {
           toolResults.push({
             tool_call_id: toolCall.id,
-            role: 'tool' as const,
+            role: 'tool',
             name,
-            content: JSON.stringify({ error: error?.message || 'Unknown tool error' })
+            content: JSON.stringify({ error: getErrorMessage(error) })
           });
         }
       }
-
-      console.log(`\n✅ All ${toolCalls.length} tool calls completed. Sending results back to model.`);
 
       const updatedMessages = [...requestMessages, assistantMessage, ...toolResults];
       const followupResponse = await openRouterClient.post('/chat/completions', {
@@ -766,17 +715,14 @@ export async function POST(req: Request) {
 
       // Capture usage from follow-up call(s)
       try {
-        const usage = (followupResponse.data as any)?.usage;
-        if (usage) {
-          const total = Number(usage.total_tokens || usage.total || usage.completion_tokens || 0);
-          usedTokens += isNaN(total) ? 0 : total;
-        }
-      } catch (_) {}
+        const usage = (followupResponse.data as UsageEnvelope)?.usage;
+        usedTokens += extractTokenCount(usage);
+      } catch {
+        // Ignore usage parsing errors
+      }
       
       // If the assistant message has no content and no more tool_calls, request a text response
       if (!assistantMessage.content && (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0)) {
-        console.log(`\n⚠️  Assistant message has no content after tool calls. Requesting final response.`);
-        // Request one more time to get a text response
         const finalResponse = await openRouterClient.post('/chat/completions', {
           model,
           messages: updatedMessages,
@@ -792,19 +738,17 @@ export async function POST(req: Request) {
         
         // Capture usage from final call
         try {
-          const usage = (finalResponse.data as any)?.usage;
-          if (usage) {
-            const total = Number(usage.total_tokens || usage.total || usage.completion_tokens || 0);
-            usedTokens += isNaN(total) ? 0 : total;
-          }
-        } catch (_) {}
+          const usage = (finalResponse.data as UsageEnvelope)?.usage;
+          usedTokens += extractTokenCount(usage);
+        } catch {
+          // Ignore usage parsing errors
+        }
         break; // Exit the loop after forcing a text response
       }
     }
     
     // Ensure assistant message has content - if still empty after all processing, provide a fallback
     if (!assistantMessage.content || assistantMessage.content.trim() === '') {
-      console.log(`\n⚠️  Assistant message has no content after all processing. Using fallback message.`);
       assistantMessage = {
         ...assistantMessage,
         content: assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0
@@ -819,9 +763,7 @@ export async function POST(req: Request) {
       toAppend.push(assistantMessage);
     }
     const persistedHistory = conversationStore.append(id, toAppend, MAX_STORED_MESSAGES);
-    saveConversationToDisk(id, persistedHistory).catch((error) => {
-      console.error('Failed to persist conversation to disk', error);
-    });
+    saveConversationToDisk(id, persistedHistory).catch(() => {});
 
     // Best-effort token decrement after successful completion
     (async () => {
@@ -835,8 +777,8 @@ export async function POST(req: Request) {
           },
           body: JSON.stringify({ utoken: userToken, decrement_by: Math.max(1, usedTokens || 0) })
         });
-      } catch (e) {
-        console.error('Token decrement error:', e);
+      } catch {
+        // Ignored
       }
     })();
 
@@ -847,19 +789,16 @@ export async function POST(req: Request) {
       }],
       usedTokens: Math.max(0, usedTokens)
     });
-  } catch (error: any) {
-    console.error('Chat API Error:', {
-      message: error.message,
-      response: error.response?.data
-    });
-    
+  } catch (error: unknown) {
+    const axiosError = axios.isAxiosError(error) ? error : undefined;
+    const responseData = axiosError?.response?.data as ErrorPayload | undefined;
     return NextResponse.json(
       { 
-        error: typeof error.response?.data?.error === 'string' 
-          ? error.response.data.error 
-          : error.response?.data?.error?.message || error.message 
+        error: typeof responseData?.error === 'string' 
+          ? responseData.error 
+          : responseData?.error?.message || getErrorMessage(error)
       },
-      { status: error.response?.status || 500 }
+      { status: axiosError?.response?.status || 500 }
     );
   }
 }
