@@ -28,9 +28,6 @@ const openRouterClient = axios.create({
   timeout: 60_000,
 });
 
-// Cache successful token checks briefly to avoid extra network hops
-const tokenCheckCache: Map<string, { expiryMs: number; remaining: number }> = new Map();
-
 // Limit the number of prior messages sent to the model to cut prompt latency
 const MAX_CONTEXT_MESSAGES = Number(process.env.CHAT_MAX_CONTEXT || 16);
 const MAX_STORED_MESSAGES = Number(process.env.CHAT_MAX_STORED || 64);
@@ -543,45 +540,12 @@ export async function POST(req: Request) {
 
     const id: string = conversationId || randomUUID();
 
-    // Require user token and check available tokens before proceeding
+    // Require user token before proceeding
     if (!userToken) {
       return NextResponse.json(
         { error: 'Unauthenticated: missing user token' },
         { status: 401 }
       );
-    }
-
-    // Token check with short-lived cache
-    try {
-      const cached = tokenCheckCache.get(userToken);
-      const now = Date.now();
-      if (!cached || cached.expiryMs < now) {
-        const tokensCheckUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'}/api/v1/tokens`;
-        const tokensResp = await fetch(tokensCheckUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.POST_TOKEN || ''}`
-          },
-          body: JSON.stringify({ utoken: userToken })
-        });
-
-        if (!tokensResp.ok) {
-          const err = (await tokensResp.json().catch(() => ({}))) as { message?: string };
-          const msg = err?.message || 'Insufficient tokens';
-          return NextResponse.json({ error: msg, tokens: 0 }, { status: 402 });
-        }
-
-        const tokensData = (await tokensResp.json().catch(() => ({}))) as { tokens?: number };
-        const remaining = tokensData?.tokens ?? 0;
-        if (!remaining || remaining <= 0) {
-          return NextResponse.json({ error: 'Insufficient tokens', tokens: 0 }, { status: 402 });
-        }
-        // Cache positive result for 60s
-        tokenCheckCache.set(userToken, { expiryMs: now + 60_000, remaining });
-      }
-    } catch (e: unknown) {
-      return NextResponse.json({ error: 'Token verification failed' }, { status: 500 });
     }
 
     const existingHistory = conversationStore.get(id) || [];
