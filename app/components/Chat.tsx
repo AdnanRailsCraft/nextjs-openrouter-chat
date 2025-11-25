@@ -100,8 +100,7 @@ const ensureVisibleContent = (raw: string): string => {
 };
 
 const getReasoningContent = (message: Message): string => {
-  const candidate = (message as Record<string, unknown>).reasoning;
-  return typeof candidate === 'string' ? candidate : '';
+  return typeof message.reasoning === 'string' ? message.reasoning : '';
 };
 
 // Apply basic inline markdown formatting (bold, italic) and linkify
