@@ -1,6 +1,7 @@
 export interface Message {
   role: 'user' | 'assistant' | 'system' | 'function' | 'tool';
   content: string;
+  reasoning?: string;
   function_call?: {
     name: string;
     arguments: string;
